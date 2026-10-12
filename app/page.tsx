@@ -35,20 +35,26 @@ export default function Page() {
   const [progress, setProgress] = useState(0)
   const [isCreating, setIsCreating] = useState(false)
   const [isGeneratingMask, setIsGeneratingMask] = useState(false)
+  const [generationError, setGenerationError] = useState<string | null>(null)
 
   const handleFile = async (file?: File) => {
     if (!file?.type.startsWith('image/')) return
     if (imageUrl) URL.revokeObjectURL(imageUrl)
     if (downloadUrl) URL.revokeObjectURL(downloadUrl)
-    setImageUrl(URL.createObjectURL(file)); setGeneratedImageUrl(null); setGeneratedImageReady(false); setDownloadUrl(null)
+    setImageUrl(URL.createObjectURL(file)); setGeneratedImageUrl(null); setGeneratedImageReady(false); setDownloadUrl(null); setGenerationError(null)
     setIsGeneratingMask(true)
     try {
-      const response = await fetch('/api/generate-mask', { method: 'POST' })
+      const formData = new FormData()
+      formData.append('image', file)
+      formData.append('style', style)
+      const response = await fetch('/api/generate-mask', { method: 'POST', body: formData })
       if (!response.ok) throw new Error('generation-failed')
       const data = await response.json() as { imageUrl?: string }
       if (data.imageUrl) setGeneratedImageUrl(data.imageUrl)
     } catch {
       setGeneratedImageUrl(null)
+      setGeneratedImageReady(false)
+      setGenerationError('No se pudo editar la imagen. Probá con otra foto.')
     } finally {
       setIsGeneratingMask(false)
     }
@@ -121,7 +127,7 @@ export default function Page() {
       <div className="mt-7 grid max-w-md gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-[#41655e]">Tu nombre<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej. Martina" className="mt-1.5 w-full rounded-xl border border-[#c9c1b4] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#c06945]" /></label><label className="text-xs font-bold text-[#41655e]">Curso<input value={course} onChange={(e) => setCourse(e.target.value)} placeholder="Ej. Sala verde" className="mt-1.5 w-full rounded-xl border border-[#c9c1b4] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#c06945]" /></label><label className="text-xs font-bold text-[#41655e] sm:col-span-2">Jardín<select value={garden} onChange={(e) => setGarden(e.target.value)} className="mt-1.5 w-full rounded-xl border border-[#c9c1b4] bg-white px-3 py-2.5 text-sm outline-none focus:border-[#c06945]"><option value="">Seleccioná un jardín</option><option value="910">Jardín 910</option><option value="912">Jardín 912</option><option value="925">Jardín 925</option></select></label></div>
       <input ref={fileInputRef} type="file" accept="image/*" className="sr-only" onChange={(event) => handleFile(event.target.files?.[0])} /><div className="mt-5 flex flex-wrap gap-3"><button onClick={() => fileInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-[#c06945] px-5 py-3 text-sm font-bold text-white"><Upload className="h-4 w-4" /> {imageUrl ? 'Cambiar imagen' : 'Subir fotografía'}</button><button disabled={!imageUrl || !generatedImageReady || !name.trim() || !course.trim() || !garden || isCreating || isGeneratingMask} onClick={createGif} className="rounded-full bg-[#174e48] px-5 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isCreating ? `Exportando ${progress}%` : generatedImageReady ? 'Crear GIF animado' : 'Esperando imagen editada'}</button>{downloadUrl && <a href={downloadUrl} download={filename} className="inline-flex items-center gap-2 rounded-full border border-[#174e48] px-5 py-3 text-sm font-bold text-[#174e48]"><Download className="h-4 w-4" /> Descargar GIF</a>}</div>
       <div className="mt-6 rounded-2xl border border-[#d8d1c5] bg-white/60 p-4"><p className="mb-3 text-xs font-bold uppercase tracking-[0.12em] text-[#6e817c]">Estilo de animación</p><div className="grid grid-cols-2 gap-2">{styles.map((item) => <button key={item.id} onClick={() => setStyle(item.id)} className={`rounded-xl border p-3 text-left transition ${style === item.id ? 'border-[#c06945] bg-[#fff3eb]' : 'border-[#e4ddd2] bg-white'}`}><span className="block text-sm font-bold text-[#174e48]">{item.label}</span><span className="text-[11px] text-[#6e817c]">{item.description}</span></button>)}</div><label className="mt-4 block text-xs font-bold text-[#41655e]">Intensidad <span className="font-normal text-[#6e817c]">{intensity}%</span><input type="range" min="10" max="100" value={intensity} onChange={(e) => setIntensity(Number(e.target.value))} className="mt-2 w-full accent-[#c06945]" /></label></div>
-      {(isCreating || isGeneratingMask) && <div className="mt-3" role="status" aria-live="polite"><div className="h-2 overflow-hidden rounded-full bg-[#d8e4d8]"><div className="h-full bg-[#c06945] transition-all" style={{ width: `${isGeneratingMask ? 18 : progress}%` }} /></div><p className="mt-1 text-xs text-[#6e817c]">{isGeneratingMask ? 'Editando tu imagen, esperá un momento…' : 'Animando la imagen editada…'}</p></div>}
+      {(isCreating || isGeneratingMask || generationError) && <div className="mt-3" role="status" aria-live="polite">{(isCreating || isGeneratingMask) && <div className="h-2 overflow-hidden rounded-full bg-[#d8e4d8]"><div className="h-full bg-[#c06945] transition-all" style={{ width: `${isGeneratingMask ? 18 : progress}%` }} /></div>}<p className={`mt-1 text-xs ${generationError ? 'text-[#b24f3d]' : 'text-[#6e817c]'}`}>{generationError ?? (isGeneratingMask ? 'Editando tu imagen, esperá un momento…' : 'Animando la imagen editada…')}</p></div>}
     </div><div className="relative mx-auto w-full max-w-[650px]"><div className="relative overflow-hidden rounded-[2rem] border-[10px] border-white bg-[#d9e2d2] shadow-[0_25px_70px_rgba(43,70,58,0.17)]"><div className="absolute left-4 top-4 z-10 rounded-full bg-[#174e48]/90 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-white">GIF · LOOP</div><img src={schoolLogo} alt="Logo institucional" className="absolute left-5 top-14 z-10 h-16 w-16 rounded-full bg-white/90 p-1 object-contain shadow-md sm:h-20 sm:w-20" /><img src={generatedImageReady && generatedImageUrl ? generatedImageUrl : imageUrl ?? schoolLogo} onLoad={(event) => { if (generatedImageUrl && event.currentTarget.currentSrc === generatedImageUrl) setGeneratedImageReady(true) }} onError={() => { setGeneratedImageReady(false); setGeneratedImageUrl(null) }} alt={imageUrl ? 'Vista previa de la máscara' : 'Subí una fotografía para ver la máscara'} style={previewStyle} className="aspect-[3/4] w-full object-cover" /><img src={rightsPatch} alt="Parche de derechos" className="absolute bottom-5 right-5 z-10 h-20 w-20 object-contain drop-shadow-[0_4px_5px_rgba(0,0,0,0.2)] sm:h-28 sm:w-28" />{!imageUrl && <div className="absolute inset-0 flex items-center justify-center bg-[#174e48]/10 text-sm font-semibold text-[#174e48]">Subí una imagen para comenzar</div>}{isGeneratingMask && <div className="absolute inset-0 flex items-center justify-center bg-[#174e48]/10 text-sm font-semibold text-[#174e48]">Generando máscara terminada…</div>}</div><p className="mt-3 px-2 text-xs text-[#6e817c]">La foto original se mantiene como base. El movimiento es general: no simula ojos ni boca.</p></div></section>
     <footer className="flex flex-col gap-1 border-t border-[#d8d1c5] py-5 text-xs text-[#6e817c] sm:flex-row sm:items-center sm:justify-between"><span>01 Fotografiá · 02 Elegí el movimiento · 03 Descargá</span><span>Canvas 2D · GIF real</span></footer>
   </div></main>

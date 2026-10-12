@@ -5,5 +5,5 @@ const MASK_PROMPT = 'Handcrafted corrugated cardboard fish mask sculpture, layer
 export async function POST() {
   const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(MASK_PROMPT)}?width=768&height=1024&nologo=true&seed=${Date.now()}`
 
-  return NextResponse.json({ imageUrl })
+  return NextResponse.json({ imageUrl }, { headers: { 'Cache-Control': 'no-store' } })
 }
